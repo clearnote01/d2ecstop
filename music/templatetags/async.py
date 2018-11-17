@@ -11,7 +11,6 @@ result['x'] = 'null'
 
 def async_view(func):
     def inner(*args, **kwargs):
-        print('running async_view')
         loop = asyncio.new_event_loop()
         asycnio.set_event_loop(loop)
         return loop.run_until_complete(func(*args, **kwargs))
@@ -42,6 +41,5 @@ def await_async(promise):
     t = Thread(target=start_loop, args=(promise,))
     t.start()
     t.join()
-    print(result.get('x'))
     return result.get('x')
 

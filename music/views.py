@@ -8,6 +8,7 @@ from .models import Album, Song
 import asyncio
 from asgiref.sync import sync_to_async, async_to_sync
 from aiohttp_requests import requests
+import aiohttp
 import requests as sync_requests
 
 AUDIO_FILE_TYPES = ['wav', 'mp3', 'ogg']
@@ -17,7 +18,6 @@ IMAGE_FILE_TYPES = ['png', 'jpg', 'jpeg']
 
 def async_view(func):
     def inner(*args, **kwargs):
-        print('running async_view')
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         return loop.run_until_complete(func(*args, **kwargs))
@@ -98,9 +98,12 @@ def delete_song(request, album_id, song_id):
 
 async def sleep_print():
     await asyncio.sleep(1)
-    print('sleep_print')
     return 'foo'
 
+async def async_request(word):
+    async with aiohttp.ClientSession() as session:
+        async with session.get('https://en.wikipedia.org/wiki/'+word) as resp:
+            return await resp.text()
 
 async def call_to_wiki(word):
     response = await requests.get('https://en.wikipedia.org/wiki/'+word)
@@ -119,19 +122,22 @@ def sync_call_to_wiki(word):
 async def detail(request, album_id):
     promise = sleep_print()
     import time
+    result = await async_request('Sadness')
+    print(result)
     start = time.time()
-    task1 = await call_to_wiki('Sadness')
-    task2 = await call_to_wiki('Fire')
-    task3 = await call_to_wiki('Mouth')
-    task4 = await call_to_wiki('Father')
-    task5 = await call_to_wiki('Salt')
-    task6 = await call_to_wiki('Sugar')
-    task7 = await call_to_wiki('Hell')
-    task8 = await call_to_wiki('Caravan')
-    task9 = await call_to_wiki('Moustache')
-    t10 = call_to_wiki_promise('Heaven')
+    task1 = await async_request('Sadness')
+    task2 = await async_request('Fire')
+    task3 = await async_request('Mouth')
+    task4 = await async_request('Father')
+    task5 = await async_request('Salt')
+    task6 = await async_request('Sugar')
+    task7 = await async_request('Hell')
+    task8 = await async_request('Caravan')
+    task9 = await async_request('Mouse')
+    promise10 = async_request('Hell')
     tt = time.time() - start
     print('time taken: ', tt)
+    t10 = call_to_wiki_promise('Heaven')
     start = time.time()
 
     sync_call_to_wiki('Sadness')
@@ -154,7 +160,7 @@ async def detail(request, album_id):
         return render(request, 'music/detail.html',
                 {'album': album,
                     'user': user,
-                    'promise': t10})
+                    'promise': promise10})
 
 #def detail(request, album_id):
 #    print('this is the detail function')
