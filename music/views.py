@@ -1,3 +1,4 @@
+import time
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import logout
 from django.http import JsonResponse
@@ -10,18 +11,11 @@ from asgiref.sync import sync_to_async, async_to_sync
 from aiohttp_requests import requests
 import aiohttp
 import requests as sync_requests
+from djincio import async_view
 
 AUDIO_FILE_TYPES = ['wav', 'mp3', 'ogg']
 IMAGE_FILE_TYPES = ['png', 'jpg', 'jpeg']
-
-# my code
-
-def async_view(func):
-    def inner(*args, **kwargs):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop.run_until_complete(func(*args, **kwargs))
-    return inner
+promise = ''
 
 def create_album(request):
     if not request.user.is_authenticated():
@@ -57,6 +51,7 @@ def create_song(request, album_id):
         for s in albums_songs:
             if s.song_title == form.cleaned_data.get("song_title"):
                 context = {
+                    'promise': promise,
                     'album': album,
                     'form': form,
                     'error_message': 'You already added that song',
@@ -96,48 +91,39 @@ def delete_song(request, album_id, song_id):
     song.delete()
     return render(request, 'music/detail.html', {'album': album})
 
-async def sleep_print():
-    await asyncio.sleep(1)
-    return 'foo'
+async def async_request_promise(word):
+    with aiohttp.ClientSession() as session:
+        with aiohttp.Timeout(10*10):
+            async with session.get('https://en.wikipedia.org/wiki/'+word) as response:
+                assert response.status == 200
+                return await response.text()
 
-async def async_request(word):
-    async with aiohttp.ClientSession() as session:
+async def async_request(session, word):
+    with aiohttp.Timeout(10*10):
         async with session.get('https://en.wikipedia.org/wiki/'+word) as resp:
-            return await resp.text()
-
-async def call_to_wiki(word):
-    response = await requests.get('https://en.wikipedia.org/wiki/'+word)
-    text = await response.text()
-    return text
-
-async def call_to_wiki_promise(word):
-    loop = asyncio.get_event_loop()
-    response = sync_call_to_wiki('Water')
-    return await loop.run_in_executor(None, sync_call_to_wiki, word)
+            assert resp.status == 200
+            return await resp.read()
 
 def sync_call_to_wiki(word):
     return sync_requests.get('https://en.wikipedia.org/wiki/'+word).text
 
 @async_view
 async def detail(request, album_id):
-    promise = sleep_print()
-    import time
-    result = await async_request('Sadness')
-    print(result)
     start = time.time()
-    task1 = await async_request('Sadness')
-    task2 = await async_request('Fire')
-    task3 = await async_request('Mouth')
-    task4 = await async_request('Father')
-    task5 = await async_request('Salt')
-    task6 = await async_request('Sugar')
-    task7 = await async_request('Hell')
-    task8 = await async_request('Caravan')
-    task9 = await async_request('Mouse')
-    promise10 = async_request('Hell')
+    with aiohttp.ClientSession() as session:
+        task1 = await async_request(session, 'Sadness')
+        task2 = await async_request(session, 'Fire')
+        task3 = await async_request(session, 'Mouth')
+        task4 = await async_request(session, 'Father')
+        task5 = await async_request(session, 'Salt')
+        task6 = await async_request(session, 'Sugar')
+        task7 = await async_request(session, 'Hell')
+        task8 = await async_request(session, 'Caravan')
+        task9 = await async_request(session, 'Mouse')
+        print(task1)
+
     tt = time.time() - start
     print('time taken: ', tt)
-    t10 = call_to_wiki_promise('Heaven')
     start = time.time()
 
     sync_call_to_wiki('Sadness')
@@ -151,7 +137,8 @@ async def detail(request, album_id):
     tt = time.time() - start
     print('time taken: ', tt)
 
-
+    global promise
+    promise = async_request_promise('Hell')
     if not request.user.is_authenticated():
         return render(request, 'music/login.html')
     else:
@@ -160,7 +147,7 @@ async def detail(request, album_id):
         return render(request, 'music/detail.html',
                 {'album': album,
                     'user': user,
-                    'promise': promise10})
+                    'promise': promise})
 
 #def detail(request, album_id):
 #    print('this is the detail function')
